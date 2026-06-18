@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/services/api';
-import { Calendar } from 'lucide-react';
 
 export default function MyLeaveRequestsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [balance, setBalance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
 
   const fetchData = async () => {
     setLoading(true);
+    setError('');
     try {
       const [reqRes, balRes] = await Promise.all([
         api.getMyLeaveRequests(),
@@ -19,7 +20,11 @@ export default function MyLeaveRequestsPage() {
       ]);
       setRequests(reqRes.data || []);
       setBalance(balRes.data);
-    } catch { setRequests([]); } finally { setLoading(false); }
+    } catch (err: any) {
+      setError(api.extractMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [year]);
@@ -34,31 +39,32 @@ export default function MyLeaveRequestsPage() {
     return <span className={`px-2 py-1 rounded-full text-xs font-medium ${s.class}`}>{s.label}</span>;
   };
 
+  const leaveBalances = balance?.leaveBalances || balance?.balances || [];
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
         <h2 className="text-lg font-semibold">Đơn nghỉ phép của tôi</h2>
         <div className="ml-auto">
           <select value={year} onChange={(e) => setYear(Number(e.target.value))}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
             {Array.from({ length: 5 }, (_, i) => <option key={i} value={year - 2 + i}>{year - 2 + i}</option>)}
           </select>
         </div>
       </div>
 
-      {balance && (
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">{error}</div>}
+
+      {leaveBalances.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
           <h3 className="text-sm font-medium text-gray-500 mb-3">Số dư nghỉ phép {year}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {balance.leaveBalances?.map((b: any, i: number) => (
-              <div key={i} className="text-center">
-                <p className="text-2xl font-bold text-indigo-600">{b.remaining ?? 0}</p>
-                <p className="text-xs text-gray-500">{b.leaveTypeName || `Loại ${b.leaveType}`}</p>
+            {leaveBalances.map((b: any, i: number) => (
+              <div key={i} className="text-center p-3 bg-gray-50 rounded-lg">
+                <p className="text-2xl font-bold text-indigo-600">{b.remaining ?? b.remained ?? 0}</p>
+                <p className="text-xs text-gray-500 mt-1">{b.leaveTypeName || b.name || `Loại ${b.leaveType}`}</p>
               </div>
             ))}
-            {!balance.leaveBalances?.length && (
-              <div className="text-sm text-gray-400 col-span-full text-center py-4">Chưa có dữ liệu</div>
-            )}
           </div>
         </div>
       )}
@@ -76,20 +82,27 @@ export default function MyLeaveRequestsPage() {
                   <th className="text-left px-4 py-3 text-gray-600">Loại</th>
                   <th className="text-left px-4 py-3 text-gray-600">Từ ngày</th>
                   <th className="text-left px-4 py-3 text-gray-600">Đến ngày</th>
+                  <th className="text-left px-4 py-3 text-gray-600">Số ngày</th>
                   <th className="text-left px-4 py-3 text-gray-600">Lý do</th>
                   <th className="text-left px-4 py-3 text-gray-600">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
-                {requests.map((r: any, i: number) => (
-                  <tr key={r.id || i} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3">{r.leaveTypeName || `Loại ${r.leaveType}`}</td>
-                    <td className="px-4 py-3">{r.fromDate ? new Date(r.fromDate).toLocaleDateString('vi-VN') : '-'}</td>
-                    <td className="px-4 py-3">{r.toDate ? new Date(r.toDate).toLocaleDateString('vi-VN') : '-'}</td>
-                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{r.reason || '-'}</td>
-                    <td className="px-4 py-3">{statusBadge(r.status)}</td>
-                  </tr>
-                ))}
+                {requests.map((r: any, i: number) => {
+                  const from = r.fromDate ? new Date(r.fromDate) : null;
+                  const to = r.toDate ? new Date(r.toDate) : null;
+                  const days = from && to ? Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : '-';
+                  return (
+                    <tr key={r.id || i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3">{r.leaveTypeName || `Loại ${r.leaveType}`}</td>
+                      <td className="px-4 py-3">{from ? from.toLocaleDateString('vi-VN') : '-'}</td>
+                      <td className="px-4 py-3">{to ? to.toLocaleDateString('vi-VN') : '-'}</td>
+                      <td className="px-4 py-3 font-medium">{days}</td>
+                      <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{r.reason || '-'}</td>
+                      <td className="px-4 py-3">{statusBadge(r.status)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

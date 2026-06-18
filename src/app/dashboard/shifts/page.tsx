@@ -7,13 +7,16 @@ import { Plus, Edit2, Trash2 } from 'lucide-react';
 export default function ShiftsPage() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ shiftCode: '', shiftName: '', startTime: '', endTime: '', standardHours: 8, isActive: true });
+  const [saving, setSaving] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await api.getShifts(); setShifts(res.data || []); } catch { setShifts([]); } finally { setLoading(false); }
+    setError('');
+    try { const res = await api.getShifts(); setShifts(res.data || []); } catch (err: any) { setError(api.extractMessage(err)); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -39,6 +42,12 @@ export default function ShiftsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.shiftCode.trim() || !form.shiftName.trim() || !form.startTime || !form.endTime) {
+      setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    setSaving(true);
+    setError('');
     try {
       const payload = { ...form, standardHours: Number(form.standardHours) };
       if (editing) {
@@ -48,12 +57,12 @@ export default function ShiftsPage() {
       }
       resetForm();
       fetchData();
-    } catch (err) { alert('Có lỗi xảy ra'); }
+    } catch (err: any) { setError(api.extractMessage(err)); } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Xóa ca làm việc này?')) return;
-    try { await api.deleteShift(id); fetchData(); } catch { alert('Không thể xóa'); }
+    try { await api.deleteShift(id); fetchData(); } catch (err: any) { setError(api.extractMessage(err)); }
   };
 
   return (
@@ -65,6 +74,8 @@ export default function ShiftsPage() {
           <Plus size={18} /> Thêm ca
         </button>
       </div>
+
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">{error}</div>}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowForm(false)}>
@@ -101,12 +112,15 @@ export default function ShiftsPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Kích hoạt?</label>
-                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4" />
+                <input type="checkbox" id="isActive" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4" />
+                <label htmlFor="isActive" className="text-sm font-medium text-gray-700">Kích hoạt</label>
               </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={resetForm} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer">Lưu</button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </button>
               </div>
             </form>
           </div>

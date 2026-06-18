@@ -7,13 +7,16 @@ import { Plus, Edit2, Trash2 } from 'lucide-react';
 export default function LeavePoliciesPage() {
   const [policies, setPolicies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ name: '', isPaid: true, annualQuotaDays: '', description: '' });
+  const [saving, setSaving] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
-    try { const res = await api.getLeavePolicies(); setPolicies(res.data || []); } catch { setPolicies([]); } finally { setLoading(false); }
+    setError('');
+    try { const res = await api.getLeavePolicies(); setPolicies(res.data || []); } catch (err: any) { setError(api.extractMessage(err)); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -25,15 +28,23 @@ export default function LeavePoliciesPage() {
   };
 
   const openEdit = (p: any) => {
-    setForm({ name: p.name || '', isPaid: p.isPaid ?? true, annualQuotaDays: p.annualQuotaDays?.toString() || '', description: p.description || '' });
+    setForm({
+      name: p.name || '',
+      isPaid: p.isPaid ?? true,
+      annualQuotaDays: p.annualQuotaDays?.toString() || '',
+      description: p.description || '',
+    });
     setEditing(p);
     setShowForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim()) { setError('Vui lòng nhập tên chính sách'); return; }
+    setSaving(true);
+    setError('');
     try {
-      const payload: any = { name: form.name, isPaid: form.isPaid };
+      const payload: any = { name: form.name.trim(), isPaid: form.isPaid };
       if (form.annualQuotaDays) payload.annualQuotaDays = parseFloat(form.annualQuotaDays);
       if (form.description) payload.description = form.description;
       if (editing) {
@@ -44,12 +55,12 @@ export default function LeavePoliciesPage() {
       }
       resetForm();
       fetchData();
-    } catch (err) { alert('Có lỗi xảy ra'); }
+    } catch (err: any) { setError(api.extractMessage(err)); } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Xóa chính sách này?')) return;
-    try { await api.deleteLeavePolicy(id); fetchData(); } catch { alert('Không thể xóa'); }
+    try { await api.deleteLeavePolicy(id); fetchData(); } catch (err: any) { setError(api.extractMessage(err)); }
   };
 
   return (
@@ -62,6 +73,8 @@ export default function LeavePoliciesPage() {
         </button>
       </div>
 
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">{error}</div>}
+
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
@@ -73,9 +86,8 @@ export default function LeavePoliciesPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
               </div>
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Có lương?</label>
-                <input type="checkbox" checked={form.isPaid} onChange={(e) => setForm({ ...form, isPaid: e.target.checked })}
-                  className="w-4 h-4" />
+                <input type="checkbox" id="isPaid" checked={form.isPaid} onChange={(e) => setForm({ ...form, isPaid: e.target.checked })} className="w-4 h-4" />
+                <label htmlFor="isPaid" className="text-sm font-medium text-gray-700">Có lương</label>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Hạn mức năm (ngày)</label>
@@ -89,7 +101,10 @@ export default function LeavePoliciesPage() {
               </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={resetForm} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer">Lưu</button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </button>
               </div>
             </form>
           </div>

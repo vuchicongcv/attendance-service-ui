@@ -9,12 +9,18 @@ export default function KioskPage() {
   const [kioskEnabled, setKioskEnabled] = useState(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
 
   const fetchStatus = async () => {
+    setStatusLoading(true);
     try {
       const res = await api.getKioskStatus();
       setKioskEnabled(res.data?.enabled ?? false);
-    } catch { }
+    } catch {
+      setKioskEnabled(false);
+    } finally {
+      setStatusLoading(false);
+    }
   };
 
   useEffect(() => { fetchStatus(); }, []);
@@ -28,11 +34,11 @@ export default function KioskPage() {
     setMessage(null);
     try {
       const payload = { employeeCode: employeeCode.trim() };
-      const res = await (action === 'check-in' ? api.kioskCheckIn(payload) : api.kioskCheckOut(payload));
+      await (action === 'check-in' ? api.kioskCheckIn(payload) : api.kioskCheckOut(payload));
       setMessage({ type: 'success', text: `${action === 'check-in' ? 'Check In' : 'Check Out'} qua kiosk thành công!` });
       setEmployeeCode('');
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.response?.data || 'Có lỗi xảy ra' });
+      setMessage({ type: 'error', text: api.extractMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -44,12 +50,16 @@ export default function KioskPage() {
       await api.toggleKiosk({ enabled: !kioskEnabled });
       setKioskEnabled(!kioskEnabled);
       setMessage({ type: 'success', text: `Kiosk đã ${!kioskEnabled ? 'bật' : 'tắt'}` });
-    } catch {
-      setMessage({ type: 'error', text: 'Không thể thay đổi trạng thái kiosk' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: api.extractMessage(err) });
     } finally {
       setLoading(false);
     }
   };
+
+  if (statusLoading) {
+    return <div className="text-center py-12 text-gray-400">Đang tải trạng thái kiosk...</div>;
+  }
 
   return (
     <div className="max-w-lg mx-auto">
@@ -79,6 +89,8 @@ export default function KioskPage() {
             placeholder="Nhập mã nhân viên..."
             className="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg text-center outline-none focus:ring-2 focus:ring-indigo-500"
             disabled={!kioskEnabled}
+            onKeyDown={(e) => { if (e.key === 'Enter' && kioskEnabled) handleKioskAction('check-in'); }}
+            autoFocus
           />
         </div>
 

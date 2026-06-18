@@ -13,6 +13,7 @@ const navItems = [
       { href: '/dashboard/attendance/kiosk', label: 'Kiosk', icon: '🖥️' },
       { href: '/dashboard/attendance/manual', label: 'Nhập thủ công', icon: '✏️' },
       { href: '/dashboard/attendance/summary', label: 'Tổng quan', icon: '📊' },
+      { href: '/dashboard/attendance/department', label: 'Theo phòng ban', icon: '🏢' },
     ],
   },
   {
@@ -54,7 +55,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
             </p>
             <ul className="space-y-1">
               {group.items.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <li key={item.href}>
                     <Link
@@ -88,8 +89,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         {sidebarContent}
       </aside>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={onClose}>
           <aside className="relative w-64 h-full">
             {sidebarContent}
           </aside>

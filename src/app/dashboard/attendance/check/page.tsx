@@ -12,11 +12,10 @@ export default function CheckInOutPage() {
     setLoading(action);
     setMessage(null);
     try {
-      const res = await (action === 'check-in' ? api.checkIn() : api.checkOut());
+      await (action === 'check-in' ? api.checkIn() : api.checkOut());
       setMessage({ type: 'success', text: `${action === 'check-in' ? 'Check In' : 'Check Out'} thành công!` });
     } catch (err: any) {
-      const text = err?.response?.data || 'Có lỗi xảy ra';
-      setMessage({ type: 'error', text: typeof text === 'string' ? text : `${action === 'check-in' ? 'Check In' : 'Check Out'} thất bại` });
+      setMessage({ type: 'error', text: api.extractMessage(err) });
     } finally {
       setLoading(null);
     }
@@ -27,7 +26,7 @@ export default function CheckInOutPage() {
       <div className="text-center mb-8">
         <Clock size={48} className="text-indigo-600 mx-auto mb-3" />
         <h2 className="text-xl font-semibold text-gray-800">Check In / Check Out</h2>
-        <p className="text-gray-500 text-sm mt-1">Nhấn nút để chấm công</p>
+        <p className="text-gray-500 text-sm mt-1">Chấm công bằng nút bấm, hệ thống tự động nhận diện bạn qua JWT token</p>
       </div>
 
       <div className="flex gap-4 justify-center">

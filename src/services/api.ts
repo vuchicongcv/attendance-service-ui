@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://courageous-playfulness-production-6a79.up.railway.app';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 class ApiService {
   private api: AxiosInstance;
@@ -9,6 +9,7 @@ class ApiService {
     this.api = axios.create({
       baseURL: API_BASE,
       headers: { 'Content-Type': 'application/json' },
+      timeout: 15000,
     });
 
     this.api.interceptors.request.use((config) => {
@@ -20,12 +21,42 @@ class ApiService {
       }
       return config;
     });
+
+    this.api.interceptors.response.use(
+      (res) => res,
+      (err) => {
+        if (err.response?.status === 401) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }
+        }
+        return Promise.reject(err);
+      }
+    );
   }
 
-  // Attendance
+  extractMessage(err: any): string {
+    if (err?.response?.data) {
+      const d = err.response.data;
+      if (typeof d === 'string') return d;
+      if (d.message) return d.message;
+      if (d.title) return d.title;
+      return JSON.stringify(d);
+    }
+    if (err?.message?.includes('timeout')) return 'Kết nối quá thời gian, vui lòng thử lại';
+    if (err?.message?.includes('Network Error')) return 'Không thể kết nối đến server';
+    return err?.message || 'Có lỗi xảy ra';
+  }
+
+  getShifts = () => this.api.get<any[]>('/api/Shifts');
+  createShift = (data: any) => this.api.post('/api/Shifts', data);
+  updateShift = (id: string, data: any) => this.api.put(`/api/Shifts/${id}`, data);
+  deleteShift = (id: string) => this.api.delete(`/api/Shifts/${id}`);
+
   checkIn = () => this.api.post('/api/Attendance/check-in');
   checkOut = () => this.api.post('/api/Attendance/check-out');
-  
+
   kioskCheckIn = (data: { employeeCode: string }) => this.api.post('/api/Attendance/kiosk/check-in', data);
   kioskCheckOut = (data: { employeeCode: string }) => this.api.post('/api/Attendance/kiosk/check-out', data);
   getKioskStatus = () => this.api.get('/api/Attendance/kiosk/status');
@@ -48,28 +79,20 @@ class ApiService {
 
   createManualAttendance = (data: any) => this.api.post('/api/Attendance', data);
 
-  // Leave Policies
-  getLeavePolicies = () => this.api.get('/api/leave-policies');
+  getLeavePolicies = () => this.api.get<any[]>('/api/leave-policies');
   createLeavePolicy = (data: any) => this.api.post('/api/leave-policies', data);
   updateLeavePolicy = (id: string, data: any) => this.api.put(`/api/leave-policies/${id}`, data);
   deleteLeavePolicy = (id: string) => this.api.delete(`/api/leave-policies/${id}`);
 
-  // Leave Requests
   createLeaveRequest = (data: any) => this.api.post('/api/leave-requests', data);
-  getMyLeaveRequests = () => this.api.get('/api/leave-requests/me');
-  getPendingLeaveRequests = () => this.api.get('/api/leave-requests/pending');
+  getMyLeaveRequests = () => this.api.get<any[]>('/api/leave-requests/me');
+  getPendingLeaveRequests = () => this.api.get<any[]>('/api/leave-requests/pending');
   getMyLeaveBalance = (year?: number) => this.api.get('/api/leave-requests/balance', { params: { year } });
   getEmployeeLeaveBalance = (employeeId: string, year?: number) =>
     this.api.get(`/api/leave-requests/balance/${employeeId}`, { params: { year } });
   approveLeaveRequest = (id: string) => this.api.post(`/api/leave-requests/${id}/approve`);
   rejectLeaveRequest = (id: string, data: { reason?: string }) =>
     this.api.post(`/api/leave-requests/${id}/reject`, data);
-
-  // Shifts
-  getShifts = () => this.api.get('/api/Shifts');
-  createShift = (data: any) => this.api.post('/api/Shifts', data);
-  updateShift = (id: string, data: any) => this.api.put(`/api/Shifts/${id}`, data);
-  deleteShift = (id: string) => this.api.delete(`/api/Shifts/${id}`);
 }
 
 const api = new ApiService();

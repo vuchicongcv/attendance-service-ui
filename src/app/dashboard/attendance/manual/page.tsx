@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/services/api';
 import { AttendanceStatus } from '@/types';
 
 export default function ManualAttendancePage() {
+  const [shifts, setShifts] = useState<any[]>([]);
   const [form, setForm] = useState({
     employeeId: '',
     workDate: new Date().toISOString().split('T')[0],
@@ -17,13 +18,21 @@ export default function ManualAttendancePage() {
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    api.getShifts().then((res) => setShifts(res.data || [])).catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.employeeId.trim()) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập Employee ID' });
+      return;
+    }
     setLoading(true);
     setMessage(null);
     try {
       const payload: any = {
-        employeeId: form.employeeId,
+        employeeId: form.employeeId.trim(),
         workDate: form.workDate,
         status: form.status,
         note: form.note || null,
@@ -34,8 +43,9 @@ export default function ManualAttendancePage() {
 
       await api.createManualAttendance(payload);
       setMessage({ type: 'success', text: 'Tạo bản ghi chấm công thành công!' });
+      setForm((prev) => ({ ...prev, checkInTime: '', checkOutTime: '', note: '' }));
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.response?.data || 'Có lỗi xảy ra' });
+      setMessage({ type: 'error', text: api.extractMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -57,9 +67,16 @@ export default function ManualAttendancePage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Shift ID</label>
-            <input value={form.shiftId} onChange={(e) => setForm({ ...form, shiftId: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ca làm việc</label>
+            <select value={form.shiftId} onChange={(e) => setForm({ ...form, shiftId: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">-- Chọn ca --</option>
+              {shifts.filter((s) => s.isActive !== false).map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.shiftName} ({s.shiftCode}) - {s.startTime?.substring(0, 5)}~{s.endTime?.substring(0, 5)}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

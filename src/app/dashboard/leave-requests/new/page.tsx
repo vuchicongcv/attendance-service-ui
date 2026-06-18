@@ -1,17 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/services/api';
 import { Send } from 'lucide-react';
 
 export default function NewLeaveRequestPage() {
+  const [leaveTypes, setLeaveTypes] = useState<{ value: number; label: string }[]>([
+    { value: 0, label: 'Nghỉ phép năm' },
+    { value: 1, label: 'Nghỉ ốm' },
+    { value: 2, label: 'Nghỉ việc riêng' },
+    { value: 3, label: 'Nghỉ không lương' },
+  ]);
   const [form, setForm] = useState({ leaveType: 0, fromDate: '', toDate: '', reason: '' });
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    api.getLeavePolicies().then((res) => {
+      const policies = res.data || [];
+      if (policies.length > 0) {
+        const types = policies.map((p: any, i: number) => ({
+          value: i,
+          label: p.name,
+        }));
+        setLeaveTypes(types);
+      }
+    }).catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fromDate || !form.toDate) { setMessage({ type: 'error', text: 'Vui lòng chọn ngày' }); return; }
+    if (!form.fromDate || !form.toDate) {
+      setMessage({ type: 'error', text: 'Vui lòng chọn ngày' });
+      return;
+    }
+    if (form.fromDate > form.toDate) {
+      setMessage({ type: 'error', text: 'Ngày kết thúc phải sau ngày bắt đầu' });
+      return;
+    }
     setLoading(true);
     setMessage(null);
     try {
@@ -24,16 +50,15 @@ export default function NewLeaveRequestPage() {
       setMessage({ type: 'success', text: 'Gửi đơn nghỉ phép thành công!' });
       setForm({ leaveType: 0, fromDate: '', toDate: '', reason: '' });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.response?.data || 'Có lỗi xảy ra' });
-    } finally { setLoading(false); }
+      setMessage({ type: 'error', text: api.extractMessage(err) });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const leaveTypes = [
-    { value: 0, label: 'Nghỉ phép năm' },
-    { value: 1, label: 'Nghỉ ốm' },
-    { value: 2, label: 'Nghỉ việc riêng' },
-    { value: 3, label: 'Nghỉ không lương' },
-  ];
+  const fromDate = form.fromDate ? new Date(form.fromDate) : null;
+  const toDate = form.toDate ? new Date(form.toDate) : null;
+  const days = fromDate && toDate ? Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
 
   return (
     <div className="max-w-lg mx-auto">
@@ -63,6 +88,9 @@ export default function NewLeaveRequestPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
             </div>
           </div>
+          {days > 0 && (
+            <p className="text-sm text-indigo-600 font-medium">Tổng: {days} ngày</p>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Lý do</label>
             <textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}
